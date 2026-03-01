@@ -43,6 +43,32 @@ def fetch_influx_data(bucket="OpenMeteo", range_start="-365d"):
     return df
 
 
+def write_influx_data(df, bucket="OpenMeteo", measurement="hourly_weather_predictions"):
+    """Writes a dataframe to InfluxDB."""
+    client = InfluxDBClient(
+        url=os.getenv("INFLUXDB_URL"),
+        token=os.getenv("INFLUXDB_TOKEN"),
+        org=os.getenv("INFLUXDB_ORG"),
+    )
+    write_api = client.write_api()
+
+    # Ensure 'time' is set as index for InfluxDB client to recognize it as the timestamp
+    df = df.copy()
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.set_index("time")
+
+    # Write data to InfluxDB
+    # By default, columns other than index and tags are treated as fields
+    write_api.write(
+        bucket=bucket,
+        record=df,
+        data_frame_measurement_name=measurement,
+        data_frame_tag_columns=["location"],
+    )
+
+    print(f"Stored {len(df)} predictions in InfluxDB bucket '{bucket}' under measurement '{measurement}'.")
+
+
 def engineer_features(df):
     """Creates lags, rolling statistics, and temporal features."""
     # Create a copy to avoid SettingWithCopyWarning
@@ -70,9 +96,9 @@ def engineer_features(df):
         "cloud_cover_low",
         "cloud_cover_mid",
         "cloud_cover_high",
-        "rain",
-        "precipitation",
-        "snowfall",
+        "snow_depth",
+        "visibility",
+        "soil_temperature",
     ]
 
     for lag in lags:
@@ -93,6 +119,11 @@ def engineer_features(df):
                 )
 
     # Handle missing values created by lags/rolling windows
-    df = df.dropna()
+    # For build_future_features, we don't want to drop rows that have NaNs in targets (our prediction row)
+    # but we DO want to drop rows that don't have enough history for lags/rolling.
+    # The columns that MUST be present are the features (lags, rolling, temporal)
+    # We identify feature columns as those ending in _lag_X, _roll_mean_X, etc.
+    feature_cols = [col for col in df.columns if "_lag_" in col or "_roll_" in col]
+    df = df.dropna(subset=feature_cols)
 
     return df

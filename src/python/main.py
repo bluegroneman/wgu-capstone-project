@@ -13,6 +13,8 @@ from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import ASYNCHRONOUS
 
 
+from datetime import datetime, timedelta
+
 def get_hourly_weather_records_by_date(
     start_date: str, end_date: str, lat: float = 42.8162, long: float = -108.7019
 ) -> DataFrame:
@@ -56,16 +58,16 @@ def get_hourly_weather_records_by_date(
         "temperature_2m": hourly.Variables(0).ValuesAsNumpy(),
         "relative_humidity_2m": hourly.Variables(1).ValuesAsNumpy(),
         "precipitation": hourly.Variables(2).ValuesAsNumpy(),
-        "rain": hourly.Variables(4).ValuesAsNumpy(),
-        "visibility": hourly.Variables(5).ValuesAsNumpy(),
-        "wind_speed_10m": hourly.Variables(6).ValuesAsNumpy(),
-        "snowfall": hourly.Variables(7).ValuesAsNumpy(),
-        "snow_depth": hourly.Variables(8).ValuesAsNumpy(),
-        "soil_temperature_0cm": hourly.Variables(9).ValuesAsNumpy(),
-        "cloud_cover": hourly.Variables(10).ValuesAsNumpy(),
-        "cloud_cover_low": hourly.Variables(11).ValuesAsNumpy(),
-        "cloud_cover_mid": hourly.Variables(12).ValuesAsNumpy(),
-        "cloud_cover_high": hourly.Variables(13).ValuesAsNumpy(),
+        "rain": hourly.Variables(3).ValuesAsNumpy(),
+        "visibility": hourly.Variables(4).ValuesAsNumpy(),
+        "wind_speed_10m": hourly.Variables(5).ValuesAsNumpy(),
+        "snowfall": hourly.Variables(6).ValuesAsNumpy(),
+        "snow_depth": hourly.Variables(7).ValuesAsNumpy(),
+        "soil_temperature_0cm": hourly.Variables(8).ValuesAsNumpy(),
+        "cloud_cover": hourly.Variables(9).ValuesAsNumpy(),
+        "cloud_cover_low": hourly.Variables(10).ValuesAsNumpy(),
+        "cloud_cover_mid": hourly.Variables(11).ValuesAsNumpy(),
+        "cloud_cover_high": hourly.Variables(12).ValuesAsNumpy(),
     }
 
     return pd.DataFrame(data=hourly_data)
@@ -87,6 +89,24 @@ def get_latest_timestamp(location_name: str) -> pd.Timestamp:
     if not tables:
         return None
     return tables[0].records[0].get_time()
+
+
+def get_global_latest_timestamp() -> pd.Timestamp:
+    client = InfluxDBClient(
+        url=os.getenv("INFLUXDB_URL"),
+        token=os.getenv("INFLUXDB_TOKEN"),
+        org=os.getenv("INFLUXDB_ORG"),
+    )
+    query_api = client.query_api()
+    query = f'from(bucket: "{os.getenv("INFLUXDB_BUCKET")}") \
+        |> range(start: -365d) \
+        |> filter(fn: (r) => r["_measurement"] == "hourly_weather") \
+        |> group() \
+        |> max(column: "_time")'
+    tables = query_api.query(query)
+    if not tables or not tables[0].records:
+        return None
+    return pd.Timestamp(tables[0].records[0].get_time())
 
 
 def insert_hourly_weather_records(records: pd.DataFrame, location_name: str):
@@ -135,14 +155,39 @@ def insert_hourly_weather_records(records: pd.DataFrame, location_name: str):
       write_api.write(bucket=os.getenv("INFLUXDB_BUCKET"), record=point)
 
 if __name__ == "__main__":
-  # Lander hourly records
-  start_date = input("Enter start date (YYYY-MM-DD): ")
-  end_date = input("Enter end date (YYYY-MM-DD): ")
-  lander_hourly_weather_records = get_hourly_weather_records_by_date(start_date, end_date, lat=42.8162, long=-108.7019)
-  insert_hourly_weather_records(lander_hourly_weather_records, location_name="lander")
-  # Pinedale hourly records
-  pinedale_hourly_weather_records = get_hourly_weather_records_by_date(start_date, end_date, lat=42.8666, long=-109.861)
-  insert_hourly_weather_records(pinedale_hourly_weather_records, location_name="pinedale")
-  # Dubois hourly records
-  dubois_hourly_weather_records = get_hourly_weather_records_by_date(start_date, end_date, lat=43.5336, long=-109.6304)
-  insert_hourly_weather_records(dubois_hourly_weather_records, location_name="dubois")
+    # Determine start_date from InfluxDB
+    latest_ts = get_global_latest_timestamp()
+    if latest_ts:
+        # Start from the day of the latest record to ensure we don't miss any hours in that day
+        start_date = latest_ts.strftime("%Y-%m-%d")
+        print(f"Latest record found: {latest_ts}. Setting start_date to {start_date}")
+    else:
+        # Default fallback if bucket is empty
+        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        print(f"No records found. Defaulting start_date to {start_date}")
+
+    # End date is today
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    print(f"End date set to: {end_date}")
+
+    # Lander hourly records
+    lander_hourly_weather_records = get_hourly_weather_records_by_date(
+        start_date, end_date, lat=42.8162, long=-108.7019
+    )
+    insert_hourly_weather_records(lander_hourly_weather_records, location_name="lander")
+
+    # Pinedale hourly records
+    pinedale_hourly_weather_records = get_hourly_weather_records_by_date(
+        start_date, end_date, lat=42.8666, long=-109.861
+    )
+    insert_hourly_weather_records(
+        pinedale_hourly_weather_records, location_name="pinedale"
+    )
+
+    # Dubois hourly records
+    dubois_hourly_weather_records = get_hourly_weather_records_by_date(
+        start_date, end_date, lat=43.5336, long=-109.6304
+    )
+    insert_hourly_weather_records(
+        dubois_hourly_weather_records, location_name="dubois"
+    )
