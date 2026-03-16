@@ -12,7 +12,6 @@ load_dotenv()
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import ASYNCHRONOUS
 
-
 from datetime import datetime, timedelta
 
 def get_hourly_weather_records_by_date(
@@ -109,6 +108,19 @@ def get_global_latest_timestamp() -> pd.Timestamp:
     return pd.Timestamp(tables[0].records[0].get_time())
 
 
+def get_season(date: datetime) -> str:
+    """Returns the season for a given date"""
+    month = date.month
+    if 3 <= month <= 5:
+        return "spring"
+    elif 6 <= month <= 8:
+        return "summer"
+    elif 9 <= month <= 11:
+        return "fall"
+    else:
+        return "winter"
+
+
 def insert_hourly_weather_records(records: pd.DataFrame, location_name: str):
     latest_timestamp = get_latest_timestamp(location_name)
 
@@ -133,10 +145,22 @@ def insert_hourly_weather_records(records: pd.DataFrame, location_name: str):
       precip = getattr(row, "precipitation")
       wind = getattr(row, "wind_speed_10m")
 
+      # Temporal and seasonal fields
+      month = date.month
+      short_month = date.strftime("%b")
+      day_of_week = date.strftime("%A")
+      year = date.year
+      season = get_season(date)
+      hour = date.hour
+      is_weekend = 1 if date.weekday() >= 5 else 0
+
       # InfluxDB data preparation and write
       point = (
           Point("hourly_weather")
           .tag("location", location_name)
+          .tag("month_name", short_month)
+          .tag("day_of_week", day_of_week)
+          .tag("season", season)
           .field("temperature", float(temp))
           .field("relative_humidity", float(getattr(row, "relative_humidity_2m")))
           .field("precipitation", float(precip))
@@ -150,20 +174,24 @@ def insert_hourly_weather_records(records: pd.DataFrame, location_name: str):
           .field("cloud_cover_low", float(getattr(row, "cloud_cover_low")))
           .field("cloud_cover_mid", float(getattr(row, "cloud_cover_mid")))
           .field("cloud_cover_high", float(getattr(row, "cloud_cover_high")))
+          .field("month", int(month))
+          .field("year", int(year))
+          .field("hour", int(hour))
+          .field("is_weekend", int(is_weekend))
           .time(date)
       )
       write_api.write(bucket=os.getenv("INFLUXDB_BUCKET"), record=point)
 
 if __name__ == "__main__":
     # Determine start_date from InfluxDB
-    latest_ts = get_global_latest_timestamp()
+    latest_ts = get_latest_timestamp("lander")
     if latest_ts:
         # Start from the day of the latest record to ensure we don't miss any hours in that day
         start_date = latest_ts.strftime("%Y-%m-%d")
         print(f"Latest record found: {latest_ts}. Setting start_date to {start_date}")
     else:
         # Default fallback if bucket is empty
-        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=(365*6))).strftime("%Y-%m-%d")
         print(f"No records found. Defaulting start_date to {start_date}")
 
     # End date is today
