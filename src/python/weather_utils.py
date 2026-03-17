@@ -117,20 +117,13 @@ def engineer_features(df):
                 df[f"{col}_roll_std_{window}"] = df.groupby("location")[col].transform(
                     lambda x: x.rolling(window).std()
                 )
-    # 4. Encoding categorical features
-    # These columns are tags in InfluxDB: 'location', 'month_name', 'day_of_week', 'season'
-    # 'location' is handled in the notebook.
-    # We should encode 'month_name', 'day_of_week', and 'season' if they exist.
+    # 4. One-Hot Encoding categorical features
+    # 'location' is handled in the notebook
     categorical_cols = ['day_of_week', 'month_name', 'season']
     cols_to_encode = [col for col in categorical_cols if col in df.columns]
     if cols_to_encode:
         df = pd.get_dummies(df, columns=cols_to_encode, prefix='Is')
 
-    # Handle missing values created by lags/rolling windows
-    # For build_future_features, we don't want to drop rows that have NaNs in targets (our prediction row)
-    # but we DO want to drop rows that don't have enough history for lags/rolling.
-    # The columns that MUST be present are the features (lags, rolling, temporal)
-    # We identify feature columns as those ending in _lag_X, _roll_mean_X, etc.
     feature_cols = [col for col in df.columns if "_lag_" in col or "_roll_" in col]
     df = df.dropna(subset=feature_cols)
 

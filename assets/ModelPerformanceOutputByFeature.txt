@@ -1,0 +1,48 @@
+
+--- Random Forest Performance ---
+rmse=0.68, r2=1.00, stdev=10.19 | temperature
+rmse=0.20, r2=0.46, stdev=0.27 | precipitation
+rmse=2.53, r2=0.88, stdev=7.40 | wind_speed
+rmse=1.65, r2=1.00, stdev=42.31 | cloud_cover
+rmse=0.16, r2=0.44, stdev=0.21 | rain
+rmse=0.07, r2=0.46, stdev=0.09 | snowfall
+
+--- Linear Regression Performance ---
+rmse=0.52, r2=1.00, stdev=10.19 | temperature
+rmse=0.22, r2=0.36, stdev=0.27 | precipitation
+rmse=2.70, r2=0.87, stdev=7.40 | wind_speed
+rmse=10.39, r2=0.94, stdev=42.31 | cloud_cover
+rmse=0.17, r2=0.36, stdev=0.21 | rain
+rmse=0.08, r2=0.35, stdev=0.09 | snowfall
+
+--- Ridge Regression Performance ---
+rmse=0.52, r2=1.00, stdev=10.19 | temperature
+rmse=0.22, r2=0.36, stdev=0.27 | precipitation
+rmse=2.70, r2=0.87, stdev=7.40 | wind_speed
+rmse=10.39, r2=0.94, stdev=42.31 | cloud_cover
+rmse=0.17, r2=0.36, stdev=0.21 | rain
+rmse=0.08, r2=0.34, stdev=0.09 | snowfall
+
+--- XGBoost Performance ---
+rmse=0.55, r2=1.00, stdev=10.19 | temperature
+rmse=0.20, r2=0.45, stdev=0.27 | precipitation
+rmse=2.41, r2=0.89, stdev=7.40 | wind_speed
+rmse=1.55, r2=1.00, stdev=42.31 | cloud_cover
+rmse=0.16, r2=0.46, stdev=0.21 | rain
+rmse=0.07, r2=0.45, stdev=0.09 | snowfall
+
+--- LightGBM Performance ---
+rmse=0.56, r2=1.00, stdev=10.19 | temperature
+rmse=0.21, r2=0.43, stdev=0.27 | precipitation
+rmse=2.41, r2=0.89, stdev=7.40 | wind_speed
+rmse=1.62, r2=1.00, stdev=42.31 | cloud_cover
+rmse=0.16, r2=0.46, stdev=0.21 | rain
+rmse=0.07, r2=0.46, stdev=0.09 | snowfall
+
+--- Model Comparison (Temperature) ---
+                model      rmse        r2
+12   Ridge Regression  0.515916  0.997438
+6   Linear Regression  0.516342  0.997434
+18            XGBoost  0.551839  0.997069
+24           LightGBM  0.557545  0.997008
+0       Random Forest  0.679246  0.995560
